@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="network.css">
+  <link rel="stylesheet" href="services.css">
+<link rel="stylesheet" href="/assets/theme.css"></head>
+<body>
+  <main class="module" id="systemModule">
+    <header class="hostline">
+      <div class="hostline-name" id="host">Loading…</div>
+      <span class="muted" id="node-label">local</span>
+      <div class="status" id="health"><span></span><b>Connecting</b></div>
+    </header>
+
+    <section class="metric-grid">
+      <article class="metric"><div class="metric-head"><span>CPU</span><strong id="cpu-value">–</strong></div><div class="meter"><i id="cpu-bar"></i></div><p class="muted" id="cpu-detail">–</p></article>
+      <article class="metric"><div class="metric-head"><span>Memory</span><strong id="mem-value">–</strong></div><div class="meter amber"><i id="mem-bar"></i></div><p class="muted" id="mem-detail">–</p></article>
+      <article class="metric"><div class="metric-head"><span>Swap</span><strong id="swap-value">–</strong></div><div class="meter"><i id="swap-bar"></i></div><p class="muted" id="swap-detail">–</p></article>
+      <article class="metric"><div class="metric-head"><span>Load</span><strong id="load-value">–</strong></div><p class="muted" id="load-detail">1m · 5m · 15m</p></article>
+      <article class="metric"><div class="metric-head"><span>Uptime</span><strong id="uptime">–</strong></div><p class="muted" id="kernel">–</p></article>
+      <article class="metric"><div class="metric-head"><span>Processes</span><strong id="processes">–</strong></div></article>
+    </section>
+
+    <section class="section" id="cores-section">
+      <div class="section-head"><h2>CPU cores</h2><span class="muted" id="core-summary">–</span></div>
+      <div class="cores" id="cores"></div>
+    </section>
+
+    <section class="section" id="machines-section">
+      <div class="section-head"><h2>Connected machines</h2></div>
+      <div class="machines" id="machines"></div>
+    </section>
+
+    <section class="section" id="disks-section">
+      <div class="section-head"><h2>Storage</h2></div>
+      <div class="disks" id="disks"></div>
+    </section>
+
+    <section class="section" id="network-section">
+      <div class="section-head"><h2>Interfaces</h2><span class="muted" id="net-total">–</span></div>
+      <div class="networks" id="networks"></div>
+    </section>
+
+    <section class="section network-universe" id="networkUniverse" hidden>
+      <div class="net-stats" id="netStats"></div>
+      <div class="net-layout">
+        <section class="panel panel-net">
+          <div class="panel-head">
+            <h2><span class="panel-glyph">◉</span> Network Universe</h2>
+            <div class="panel-tools">
+              <span class="panel-hint" id="netUpdated">reading sockets…</span>
+              <label class="net-toggle" title="Include loopback connections"><input type="checkbox" id="netLocal" /> local</label>
+              <button class="btn btn-soft" id="netPause" type="button">❚❚ Pause</button>
+              <button class="btn btn-soft" id="netRefresh" type="button" title="Refresh">⟳</button>
+            </div>
+          </div>
+          <div class="net-groups" id="netGroups" hidden></div>
+          <div class="net-stage" id="netStage">
+            <canvas id="netCanvas" aria-label="Live graph of network connections"></canvas>
+            <div class="net-tip" id="netTip" hidden></div>
+            <div class="net-empty" id="netEmpty" hidden>No active connections.</div>
+            <div class="net-legend" aria-hidden="true">
+              <span><i class="net-dot proc"></i> process</span>
+              <span><i class="net-dot host"></i> endpoint</span>
+              <span><i class="net-line"></i> bandwidth</span>
+              <span class="net-legend-hint">hover traces · click isolates</span>
+            </div>
+          </div>
+        </section>
+        <aside class="panel panel-inspect" id="netInspect">
+          <div class="panel-head">
+            <h2><span class="panel-glyph">⌖</span> Connection</h2>
+            <button class="btn btn-soft" id="netInspectClose" type="button" hidden>✕</button>
+          </div>
+          <div class="ni-empty" id="netInspectEmpty">
+            <div class="ni-empty-glyph">◌</div>
+            <p>Click a connection pill, endpoint or link to inspect it.</p>
+            <p class="ni-empty-hint">Process chips isolate a group; All resets. Unknown owners connect straight from the host.</p>
+          </div>
+          <div id="netInspectBody" hidden></div>
+        </aside>
+      </div>
+    </section>
+
+    <details class="sysd" id="servicesControl" hidden>
+      <summary>
+        <span><span class="sysd-glyph">⚙</span> System services</span>
+        <span class="sysd-summary" id="sysdSummary">services</span>
+      </summary>
+      <div class="sysd-body">
+        <div class="sysd-toolbar">
+          <div class="seg" id="sysdScope">
+            <button type="button" data-scope="user" class="is-active">User</button>
+            <button type="button" data-scope="system">System</button>
+          </div>
+          <input class="sysd-filter" id="sysdFilter" type="text" placeholder="Filter services…" autocomplete="off" />
+          <button class="btn btn-soft" id="sysdRefresh" type="button" title="Refresh">⟳</button>
+        </div>
+        <div class="sysd-chips" id="sysdChips">
+          <button type="button" class="chip is-active" data-chip="active">Active</button>
+          <button type="button" class="chip" data-chip="failed">Failed</button>
+          <button type="button" class="chip" data-chip="timers">Timers</button>
+          <button type="button" class="chip" data-chip="all">All</button>
+        </div>
+        <p class="sysd-ro" id="sysdReadonly" hidden>System units are read-only here — acting on them needs root.</p>
+        <div class="sysd-list" id="sysdList"></div>
+        <div class="sysd-logs-panel" id="sysdLogsPanel" hidden>
+          <div class="sysd-logs-head"><b id="sysdLogsTitle">Logs</b><span><button class="btn btn-soft" id="sysdLogsRefresh" type="button">⟳</button><button class="btn btn-soft" id="sysdLogsClose" type="button">✕</button></span></div>
+          <pre class="sysd-logs" id="sysdLogs"></pre>
+        </div>
+      </div>
+    </details>
+
+    <div class="split">
+      <section class="section" id="temps-section"><div class="section-head"><h2>Thermals</h2></div><div class="temps" id="temps"></div></section>
+      <section class="section" id="gpus-section"><div class="section-head"><h2>Graphics</h2></div><div class="gpus" id="gpus"></div></section>
+    </div>
+    <section class="section" id="batteries-section"><div class="section-head"><h2>Power</h2></div><div class="batteries" id="batteries"></div></section>
+
+    <footer><span id="captured">waiting for data</span><span class="dot"></span><span id="platform">–</span></footer>
+  </main>
+  <script src="app.js"></script>
+  <script src="network.js"></script>
+  <script src="services.js"></script>
+</body>
+</html>

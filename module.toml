@@ -1,0 +1,109 @@
+schema = 1
+id = "system"
+name = "System"
+version = "0.3.2"
+api_version = "1"
+description = "Live host metrics, the Network Universe, and system services."
+entry = "ui/index.html"
+overview = "ui/overview.html"
+overview_default = true
+icon = "ui/icon.svg"
+node_scope = "node"
+permissions = ["node.info", "node.metrics", "nodes.read", "backend", "agent"]
+
+[ui]
+surface = "page"
+
+[backend]
+kind = "sidecar"
+command = ["python3", "backend/server.py"]
+health_path = "/health"
+ready_timeout_ms = 15000
+sandbox = false
+platforms = ["linux", "macos", "windows"]
+
+[[config.fields]]
+key = "refresh_ms"
+type = "number"
+label = "Refresh interval"
+default = 3000
+min = 1000
+max = 60000
+step = 500
+help = "How often the System page refreshes live metrics."
+
+[[config.fields]]
+key = "show_cores"
+type = "boolean"
+label = "Show per-core CPU"
+default = true
+help = "Display the CPU core heatmap."
+
+[[config.fields]]
+key = "show_disks"
+type = "boolean"
+label = "Show physical disks"
+default = true
+
+[[config.fields]]
+key = "show_network"
+type = "boolean"
+label = "Show network throughput"
+default = true
+
+[[config.fields]]
+key = "show_temperatures"
+type = "boolean"
+label = "Show temperatures"
+default = true
+
+[[config.fields]]
+key = "show_gpus"
+type = "boolean"
+label = "Show GPUs"
+default = true
+
+[[config.fields]]
+key = "show_batteries"
+type = "boolean"
+label = "Show batteries"
+default = true
+
+[[config.fields]]
+key = "show_machines"
+type = "boolean"
+label = "Show connected machines"
+default = true
+
+[[config.fields]]
+key = "compact"
+type = "boolean"
+label = "Compact layout"
+default = false
+
+[[config.fields]]
+key = "cpu_warn"
+type = "number"
+label = "CPU warning threshold"
+default = 85
+min = 1
+max = 100
+step = 1
+
+[[config.fields]]
+key = "memory_warn"
+type = "number"
+label = "Memory warning threshold"
+default = 85
+min = 1
+max = 100
+step = 1
+
+[[config.fields]]
+key = "disk_warn"
+type = "number"
+label = "Disk warning threshold"
+default = 90
+min = 1
+max = 100
+step = 1
