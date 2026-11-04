@@ -53,6 +53,37 @@ udp4       0      0  192.168.1.10.5353      *.*                                0
         self.assertEqual(rows[0]["pid"], 0)
         self.assertEqual(rows[1]["remote_ip"], "::1")
 
+    def test_windows_services_snapshot(self) -> None:
+        original = server.run_powershell
+        server.run_powershell = lambda *_args, **_kwargs: (
+            0,
+            '[{"Name":"Spooler","DisplayName":"Print Spooler","Status":"Running","StartType":"Automatic"}]',
+            "",
+        )
+        try:
+            result = server.windows_services_snapshot()
+        finally:
+            server.run_powershell = original
+        self.assertTrue(result["available"])
+        self.assertEqual(result["services"][0]["unit"], "Spooler")
+        self.assertEqual(result["services"][0]["active"], "active")
+        self.assertEqual(result["counts"]["active"], 1)
+
+    def test_windows_network_snapshot(self) -> None:
+        original = server.run_powershell
+        server.run_powershell = lambda *_args, **_kwargs: (
+            0,
+            '[{"proto":"tcp","state":"Established","local":"127.0.0.1","lport":9477,'
+            '"remote":"127.0.0.1","rport":51000,"pid":42,"name":"orqella"}]',
+            "",
+        )
+        try:
+            result = server.network_snapshot_windows(include_local=True)
+        finally:
+            server.run_powershell = original
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["connections"][0]["state"], "ESTAB")
+
     def test_loopback_detection(self) -> None:
         for value in ("127.0.0.1", "127.9.8.7", "::1", "localhost", "::ffff:127.0.0.1"):
             self.assertTrue(server.is_loopback(value), value)
