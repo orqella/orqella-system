@@ -78,7 +78,7 @@
   position: fixed; right: 18px; bottom: 18px; z-index: 50; max-width: 320px;
   display: flex; flex-direction: column; gap: 2px; padding: 9px 12px;
   border: 1px solid var(--line); border-radius: 9px; background: var(--panel2);
-  color: var(--ink); box-shadow: 0 16px 40px rgba(0,0,0,.35); font-size: 11px;
+  color: var(--ink); box-shadow: var(--shadow); font-size: 11px;
 }
 .sysd-toast span { color: var(--muted); overflow-wrap: anywhere; }
 .sysd-toast.ok { border-color: color-mix(in srgb, var(--mint) 45%, var(--line)); }

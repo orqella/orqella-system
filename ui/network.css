@@ -61,7 +61,7 @@
   max-width: 260px; padding: 8px 11px;
   background: color-mix(in srgb, var(--bg-darker) 92%, transparent);
   border: 1px solid var(--border); border-radius: 9px;
-  box-shadow: 0 14px 34px -18px #000;
+  box-shadow: var(--shadow);
   font-size: 11.5px; line-height: 1.5; color: var(--fg);
   backdrop-filter: blur(12px);
 }
@@ -166,50 +166,23 @@
   .net-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Shared tokens used by the ported canvas and inspector. */
-:root {
-  --bg-darker: var(--bg-inset, #080c0f);
+/* Theme aliases used by the ported canvas and inspector. The values stay
+ * token-driven so the network view follows the selected Orqella theme. */
+.network-universe {
+  --bg-darker: var(--bg-inset);
   --fg: var(--ink);
   --fg-dim: var(--muted);
   --bright: var(--ink);
   --border: var(--line);
-  --border-soft: var(--line-soft, #1b2a30);
+  --border-soft: var(--line-soft);
   --accent: var(--mint);
-  --accent-2: #c7a7ff;
-  --cyan: var(--blue, #7fc8e8);
-  --green: var(--mint);
+  --cyan: var(--blue);
   --yellow: var(--amber);
-  --orange: var(--amber-2, #f0a37b);
-  --mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
-  --font: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
-  --lighter: var(--panel2);
+  --orange: var(--amber-2);
+  --mono: var(--font-mono);
+  --font: var(--font-sans);
+  --lighter: var(--panel-2);
   --panel-solid: var(--panel);
-  --shadow: 0 18px 50px rgba(0, 0, 0, .24);
-  --radius: 14px;
-  --radius-sm: 10px;
-}
-
-/* Local aliases keep the ported selectors readable. */
-.network-universe {
-  --bg-darker: #080c0f;
-  --fg: var(--ink);
-  --fg-dim: var(--muted);
-  --bright: #f4fbf8;
-  --border: var(--line);
-  --border-soft: #1b2a30;
-  --accent: var(--mint);
-  --accent-2: #c7a7ff;
-  --cyan: #7fc8e8;
-  --green: var(--mint);
-  --yellow: var(--amber);
-  --orange: #f0a37b;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --lighter: var(--panel2);
-  --panel-solid: var(--panel);
-  --shadow: 0 18px 50px rgba(0, 0, 0, .24);
-  --radius: 14px;
-  --radius-sm: 10px;
 }
 .network-universe .panel {
   min-width: 0;
@@ -230,14 +203,14 @@
 }
 .network-universe .btn:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); color: var(--bright); }
 .network-universe .btn-soft { background: color-mix(in srgb, var(--panel) 70%, transparent); }
-.network-universe .btn-accent { background: var(--accent); color: #07110d; font-weight: 650; }
+.network-universe .btn-accent { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
 .network-universe .btn:disabled { opacity: .55; cursor: wait; }
 .network-universe .net-stage { height: clamp(380px, calc(100dvh - 380px), 660px); }
 .nu-toast {
   position: fixed; right: 18px; bottom: 18px; z-index: 50; max-width: 320px;
   display: flex; flex-direction: column; gap: 2px; padding: 9px 12px;
   border: 1px solid var(--line); border-radius: 9px; background: var(--panel2);
-  color: var(--ink); box-shadow: 0 16px 40px rgba(0,0,0,.35); font-size: 11px;
+  color: var(--ink); box-shadow: var(--shadow); font-size: 11px;
 }
 .nu-toast span { color: var(--muted); overflow-wrap: anywhere; }
 .nu-toast.ok { border-color: color-mix(in srgb, var(--mint) 45%, var(--line)); }

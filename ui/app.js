@@ -56,7 +56,7 @@
     const section=$("cores-section"); section.hidden = !cfg.show_cores || !cores.length;
     if (section.hidden) return;
     $("core-summary").textContent = `${cores.length} cores · avg ${pct(cores.reduce((a,b)=>a+b,0)/cores.length)}`;
-    $("cores").innerHTML = cores.map((value,index) => { const opacity=Math.max(.08,Math.min(.9,value/100)); return `<div class="core" title="Core ${index}: ${pct(value)}" style="background:rgba(139,233,192,${opacity});color:${value>70?'#07110d':'var(--ink)'}">${index}</div>`; }).join("");
+    $("cores").innerHTML = cores.map((value,index) => { const load=Math.round(Math.max(8,Math.min(90,value))); return `<div class="core" title="Core ${index}: ${pct(value)}" style="background:color-mix(in srgb,var(--mint) ${load}%,var(--bg-inset));color:${value>70?'var(--accent-ink)':'var(--ink)'}">${index}</div>`; }).join("");
   }
   function renderMachines(nodes) {
     const section=$("machines-section"); section.hidden = !cfg.show_machines;
@@ -66,7 +66,7 @@
   function renderDisks(disks, threshold) {
     const section=$("disks-section"); section.hidden = !cfg.show_disks || !disks.length;
     if (section.hidden) return;
-    $("disks").innerHTML = disks.sort((a,b)=>b.total-a.total).slice(0,8).map(d => `<div class="disk"><div class="disk-top"><b>${escape(d.mount)}</b><small>${escape(d.name)} · ${bytes(d.used)} / ${bytes(d.total)} · ${Math.round(d.percent)}%</small></div><div class="meter"><i style="width:${Math.min(100,d.percent)}%;background:${d.percent>=threshold?'var(--red)':d.percent>=threshold*.8?'var(--amber)':'linear-gradient(90deg,var(--mint),#69c7df)'}"></i></div></div>`).join("");
+    $("disks").innerHTML = disks.sort((a,b)=>b.total-a.total).slice(0,8).map(d => `<div class="disk"><div class="disk-top"><b>${escape(d.mount)}</b><small>${escape(d.name)} · ${bytes(d.used)} / ${bytes(d.total)} · ${Math.round(d.percent)}%</small></div><div class="meter"><i style="width:${Math.min(100,d.percent)}%;background:${d.percent>=threshold?'var(--red)':d.percent>=threshold*.8?'var(--amber)':'linear-gradient(90deg,var(--mint),var(--mint-dim))'}"></i></div></div>`).join("");
   }
   function renderNetwork(networks) {
     const section=$("network-section"); section.hidden = !cfg.show_network || !networks.length;

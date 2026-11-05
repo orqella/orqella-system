@@ -1,7 +1,7 @@
 schema = 1
 id = "system"
 name = "System"
-version = "0.3.2"
+version = "0.3.3"
 api_version = "1"
 description = "Live host metrics, the Network Universe, and system services."
 entry = "ui/index.html"
