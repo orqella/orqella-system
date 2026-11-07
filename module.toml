@@ -1,7 +1,7 @@
 schema = 1
 id = "system"
 name = "System"
-version = "0.3.3"
+version = "0.3.4"
 api_version = "1"
 description = "Live host metrics, the Network Universe, and system services."
 entry = "ui/index.html"
@@ -21,6 +21,7 @@ health_path = "/health"
 ready_timeout_ms = 15000
 sandbox = false
 platforms = ["linux", "macos", "windows"]
+python = ">=3.10"
 
 [[config.fields]]
 key = "refresh_ms"
