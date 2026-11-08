@@ -1,4 +1,4 @@
-// Network Universe, ported from Lamprey Deck.
+// Network Universe
 (() => {
   "use strict";
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
