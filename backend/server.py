@@ -2,6 +2,7 @@
 """System module sidecar: Linux network sockets and systemd control center."""
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import platform
@@ -121,7 +122,7 @@ def service_scopes() -> list[str]:
 
 
 UNIT_NAME_RE = re.compile(
-    r"^[A-Za-z0-9:_.@\\-]+\.(?:service|timer|socket|target|mount|automount|swap|path|slice|scope|device|busname)$"
+    r"^[A-Za-z0-9_.@][A-Za-z0-9:_.@\\-]*\.(?:service|timer|socket|target|mount|automount|swap|path|slice|scope|device|busname)$"
 )
 SYSTEMD_ACTIONS = ("start", "stop", "restart", "reset-failed")
 
@@ -1279,11 +1280,11 @@ def service_action(scope: str, unit: str, action: str) -> tuple[dict, int]:
         if unit in ("orqella.service", "orqella-update.service") or unit.startswith("orqella-update-"):
             return {"error": "that is the dashboard itself"}, 400
         rc, out, _err = run(
-            ["systemctl", "--user", "show", unit, "-p", "LoadState", "--value"], timeout=5
+            ["systemctl", "--user", "show", "-p", "LoadState", "--value", "--", unit], timeout=5
         )
         if rc != 0 or out.strip() != "loaded":
             return {"error": f"unknown unit {unit}"}, 404
-        rc, out, err = run(["systemctl", "--user", action, unit], timeout=30)
+        rc, out, err = run(["systemctl", "--user", action, "--", unit], timeout=30)
         return {
             "ok": rc == 0,
             "unit": unit,
@@ -1439,7 +1440,8 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _authorized(self) -> bool:
-        return self.headers.get("X-Orqella-Module-Token") == TOKEN
+        supplied = self.headers.get("X-Orqella-Module-Token") or ""
+        return bool(TOKEN) and hmac.compare_digest(supplied, TOKEN)
 
     def _json(self, body, status: int = 200):
         data = json.dumps(body).encode("utf-8")

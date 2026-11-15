@@ -172,6 +172,7 @@ class SystemdTests(unittest.TestCase):
             )
             self.assertEqual(server.service_action("user", "a.service", "explode")[1], 400)
             self.assertEqual(server.service_action("user", "bad name", "start")[1], 400)
+            self.assertEqual(server.service_action("user", "-Hattacker.service", "start")[1], 400)
             self.assertEqual(server.service_action("user", "orqella.service", "start")[1], 400)
             self.assertEqual(
                 server.service_action("user", "orqella-update-123.service", "start")[1],
@@ -192,7 +193,7 @@ class SystemdTests(unittest.TestCase):
                 body, status = server.service_action("user", "demo.service", "restart")
             self.assertEqual(status, 200)
             self.assertTrue(body["ok"])
-            self.assertEqual(calls[-1], ["systemctl", "--user", "restart", "demo.service"])
+            self.assertEqual(calls[-1], ["systemctl", "--user", "restart", "--", "demo.service"])
 
         with mock.patch.object(server, "services_available", return_value=False):
             self.assertEqual(server.service_action("user", "demo.service", "start")[1], 503)
