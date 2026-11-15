@@ -36,8 +36,15 @@ then write `FINDINGS.md`. The inspector shows that report and keeps the raw agen
 log collapsed. No private key material or unrelated system data is included.
 
 The agent runs outside the sidecar sandbox by design. Grant only if you trust the
-configured agent; the prompt explicitly treats connection fields as untrusted
-data and restricts changes to the temporary workspace.
+configured agent; the prompt tells it to treat every connection field as
+untrusted data and restricts changes to the temporary workspace. Investigation
+records live under `data/identify/` (0700, files 0600), not in the module
+checkout, so an investigation never blocks a module update.
+
+Service actions return HTTP 200 with `ok: false` when the service manager
+rejects a start/stop/restart; the UI shows the manager's `detail` text. The
+request itself is valid, so callers should inspect the body rather than relying
+on the HTTP status alone.
 
 On macOS, Apple launchd agents and GUI application jobs are filtered out so the
 list stays focused on user-installed services. System-domain launchd inspection
