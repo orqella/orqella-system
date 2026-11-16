@@ -209,7 +209,8 @@ async function loadNetwork(force = false) {
       if (fresh) net.selected = fresh;
       else if (!data.capped) net.selected = { ...net.selected, gone: true, state: "CLOSED" };
     }
-    if (!net.everLoaded && data.connections.length) {
+    const autoSelected = !net.everLoaded && data.connections.length > 0;
+    if (autoSelected) {
       net.selected = data.connections[0];
       net.selId = net.selected.id;
     }
@@ -217,6 +218,7 @@ async function loadNetwork(force = false) {
     renderNetGroups();
     renderNetStats();
     renderNetInspector();
+    if (autoSelected) loadSavedNetIdentify(net.selected);
     const updated = document.getElementById("netUpdated");
     if (updated) {
       const when = new Date((data.generated || Date.now() / 1000) * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -357,6 +359,10 @@ function agentPermissionState() {
   };
 }
 
+function netIdentifyBusy(ai) {
+  return !!ai && ["preparing", "starting", "queued", "running"].includes(ai.status);
+}
+
 function startNetIdentify() {
   const c = net.selected;
   if (!c) return;
@@ -365,6 +371,7 @@ function startNetIdentify() {
     return;
   }
   if (net.aiTimer) clearTimeout(net.aiTimer);
+  if (net.ai?.timer) clearTimeout(net.ai.timer);
   net.ai = {
     connId: c.id,
     status: "preparing",
@@ -404,6 +411,39 @@ function startNetIdentify() {
       renderNetInspector();
     }
   })();
+}
+
+async function loadSavedNetIdentify(conn) {
+  if (!conn || net.ai?.connId === conn.id || netIdentifyBusy(net.ai)) return;
+  try {
+    const saved = await backendRequest("/api/identify/lookup", "POST", {
+      proto: conn.proto,
+      state: conn.state,
+      local: conn.local,
+      remote: conn.remote,
+      process: conn.process,
+    });
+    if (!saved?.id || !saved.text) return;
+    if (net.selected?.id !== conn.id) return;
+    if (net.ai?.connId === conn.id || netIdentifyBusy(net.ai)) return;
+    net.ai = {
+      connId: conn.id,
+      status: "succeeded",
+      log: "",
+      findings: saved.text,
+      findingsHtml: mdToHtml(saved.text),
+      error: null,
+      root: "",
+      workspaceId: saved.id,
+      jobId: "",
+      timer: null,
+      saved: true,
+      updated: Number(saved.updated) || 0,
+    };
+    renderNetInspector();
+  } catch {
+    // A lookup miss is normal; keep the Identify button available.
+  }
 }
 
 async function pollNetIdentify() {
@@ -604,15 +644,16 @@ function renderNetInspector() {
 
   const agent = agentPermissionState();
   const ai = net.ai && net.ai.connId === c.id ? net.ai : null;
-  const aiBusy = ai && ["preparing", "starting", "queued", "running"].includes(ai.status);
+  const aiBusy = netIdentifyBusy(ai);
   const aiPanel = ai ? `
     <div class="ni-ai">
-      <div class="ni-ai-head"><span>AI identification</span><b data-state="${esc(ai.status)}">${esc(ai.status)}</b></div>
+      <div class="ni-ai-head"><span>AI identification</span><b data-state="${esc(ai.saved ? "succeeded" : ai.status)}">${esc(ai.saved ? "saved" : ai.status)}</b></div>
+      ${ai.saved ? `<p class="ni-ai-note">Saved identification${ai.updated ? ` · ${esc(netAgo(now - ai.updated))} ago` : ""} · run again to refresh.</p>` : ""}
       ${aiBusy && !ai.findings ? `<p class="ni-ai-note">Investigating the connection with the configured agent…</p>` : ""}
       ${ai.error ? `<p class="ni-ai-error">${esc(ai.error)}</p>` : ""}
       ${ai.findings ? `<div class="ni-ai-findings">${ai.findingsHtml || mdToHtml(ai.findings)}</div>` : ""}
       ${ai.log ? `<details class="ni-ai-log-wrap"><summary>Agent log</summary><pre class="ni-ai-log">${esc(ai.log)}</pre></details>` : ""}
-      <div class="ni-actions"><button class="btn btn-soft" type="button" data-ni-identify ${aiBusy ? "disabled" : ""}>${ai.jobId ? "Run again" : "Retry"}</button></div>
+      <div class="ni-actions"><button class="btn btn-soft" type="button" data-ni-identify ${aiBusy ? "disabled" : ""}>${ai.jobId || ai.findings || ai.status === "succeeded" ? "Run again" : "Retry"}</button></div>
     </div>` : "";
 
   const inspectKey = `${c.id}:${ai?.workspaceId || ""}`;
@@ -1331,6 +1372,7 @@ function netSelectHit(hit) {
   net.hover = null;
   document.getElementById("netTip").hidden = true;
   renderNetInspector();
+  loadSavedNetIdentify(net.selected);
   if (window.innerWidth <= 1080) {
     document.getElementById("netInspect")?.scrollIntoView({ behavior: net.reduced ? "auto" : "smooth", block: "nearest" });
   }

@@ -32,8 +32,11 @@ sensitive `agent` permission and a configured Orqella agent (OpenCode by default
 The sidecar creates a temporary workspace containing only the selected
 connection, and the agent is asked to do bounded, read-only investigation — DNS,
 RDAP/WHOIS, ASN, TLS certificates, service banners, and local process context —
-then write `FINDINGS.md`. The inspector shows that report and keeps the raw agent
-log collapsed. No private key material or unrelated system data is included.
+then write `FINDINGS.md`. The inspector renders that report as Markdown and keeps
+the raw agent log collapsed. Completed reports are kept per connection identity —
+same protocol, remote endpoint, and owner — so selecting that connection again
+shows the saved report; **Run again** starts a fresh investigation. No private
+key material or unrelated system data is included.
 
 The agent runs outside the sidecar sandbox by design. Grant only if you trust the
 configured agent; the prompt tells it to treat every connection field as

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import copy
+import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -300,6 +303,104 @@ class SystemdTests(unittest.TestCase):
         env = run.call_args.kwargs["env"]
         self.assertNotIn("ORQELLA_MODULE_TOKEN", env)
         self.assertNotIn("ORQELLA_MODULE_CONFIG", env)
+
+
+class IdentifyTests(unittest.TestCase):
+    def _record(self) -> dict:
+        return {
+            "proto": "tcp",
+            "state": "ESTAB",
+            "local": {"ip": "192.168.68.10", "port": 38260, "host": "", "service": ""},
+            "remote": {
+                "ip": "96.252.54.117",
+                "port": 443,
+                "host": "pool-96-252-54-117.bstnma.fios.verizon.net",
+                "service": "https",
+            },
+            "process": {
+                "pid": 688855,
+                "name": "chromium",
+                "user": "eolu",
+                "cmd": "/usr/lib/chromium/chromium",
+                "owner_kind": "process",
+                "owner_label": "chromium",
+                "container": "",
+                "unit": "",
+            },
+        }
+
+    def _write_workspace(
+        self,
+        root: Path,
+        name: str,
+        record: dict,
+        findings: str | None,
+        mtime: float,
+    ) -> None:
+        workspace = root / name
+        workspace.mkdir()
+        (workspace / "connection.json").write_text(json.dumps(record), encoding="utf-8")
+        if findings is not None:
+            (workspace / "FINDINGS.md").write_text(findings, encoding="utf-8")
+            os.utime(workspace / "FINDINGS.md", (mtime, mtime))
+        os.utime(workspace, (mtime, mtime))
+
+    def test_fingerprint_ignores_pid_and_local_port(self) -> None:
+        record = self._record()
+        churned = copy.deepcopy(record)
+        churned["process"]["pid"] = 12345
+        churned["local"]["port"] = 55000
+        self.assertEqual(
+            server._identify_fingerprint(server._identify_record(record)),
+            server._identify_fingerprint(server._identify_record(churned)),
+        )
+
+    def test_lookup_returns_newest_matching_saved_findings(self) -> None:
+        record = self._record()
+        now = time.time()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_workspace(root, "a" * 32, record, "old report", now - 100)
+            self._write_workspace(root, "b" * 32, record, "new report", now)
+            other = copy.deepcopy(record)
+            other["remote"]["ip"] = "203.0.113.9"
+            self._write_workspace(root, "c" * 32, other, "other report", now + 10)
+            # An unfinished workspace for the same connection must not win.
+            self._write_workspace(root, "d" * 32, record, None, now + 20)
+            with mock.patch.object(server, "IDENTIFY_DIR", root):
+                body, status = server.identify_lookup(record)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["id"], "b" * 32)
+        self.assertEqual(body["text"], "new report")
+        self.assertGreater(body["updated"], 0)
+
+    def test_lookup_requires_same_owner_endpoint_and_proto(self) -> None:
+        record = self._record()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_workspace(root, "a" * 32, record, "report", time.time())
+            with mock.patch.object(server, "IDENTIFY_DIR", root):
+                same = copy.deepcopy(record)
+                same["process"]["pid"] = 99
+                same["local"]["port"] = 4242
+                self.assertEqual(server.identify_lookup(same)[0]["id"], "a" * 32)
+                self.assertEqual(server.identify_lookup(record)[0]["text"], "report")
+
+                other_owner = copy.deepcopy(record)
+                other_owner["process"]["owner_label"] = "firefox"
+                self.assertEqual(server.identify_lookup(other_owner)[0]["id"], "")
+
+                other_port = copy.deepcopy(record)
+                other_port["remote"]["port"] = 8443
+                self.assertEqual(server.identify_lookup(other_port)[0]["id"], "")
+
+                other_proto = copy.deepcopy(record)
+                other_proto["proto"] = "udp"
+                self.assertEqual(server.identify_lookup(other_proto)[0]["id"], "")
+
+                missing_remote = copy.deepcopy(record)
+                missing_remote["remote"]["ip"] = ""
+                self.assertEqual(server.identify_lookup(missing_remote)[0]["id"], "")
 
 
 if __name__ == "__main__":

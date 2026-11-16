@@ -1474,6 +1474,75 @@ Then reply with a short three-sentence summary. Do not edit anything outside thi
     return {"id": workspace_id, "root": str(root), "prompt": prompt}
 
 
+def _identify_fingerprint(record: dict) -> str:
+    """Stable identity for one connection across pid and local-port churn.
+
+    Two sockets to the same remote endpoint owned by the same process (or
+    container/unit) are treated as the same investigation target.
+    """
+    remote = record.get("remote") if isinstance(record.get("remote"), dict) else {}
+    process = record.get("process") if isinstance(record.get("process"), dict) else {}
+    kind = str(process.get("owner_kind") or ("process" if process.get("pid") else "unknown")).strip().lower()
+    if kind == "container":
+        label = process.get("container") or process.get("owner_label") or ""
+    elif kind == "service":
+        label = process.get("unit") or process.get("owner_label") or ""
+    else:
+        label = process.get("owner_label") or process.get("name") or ""
+    ip = str(remote.get("ip") or "").strip()
+    port = int(remote.get("port") or 0)
+    return "|".join([
+        str(record.get("proto") or "").strip().lower(),
+        f"{ip}:{port}",
+        kind,
+        str(label).strip().lower(),
+    ])
+
+
+def _identify_mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _identify_roots() -> list[Path]:
+    try:
+        roots = [p for p in IDENTIFY_DIR.iterdir() if p.is_dir() and IDENTIFY_ID.fullmatch(p.name)]
+        roots.sort(key=_identify_mtime, reverse=True)
+        return roots
+    except OSError:
+        return []
+
+
+def identify_lookup(body: dict) -> tuple[dict, int]:
+    """Return the newest saved findings for a matching connection, if any."""
+    record = _identify_record(body)
+    if not record["remote"]["ip"] or not record["remote"]["port"]:
+        return {"id": "", "text": "", "updated": 0}, 200
+    target = _identify_fingerprint(record)
+    for root in _identify_roots():
+        try:
+            saved = json.loads((root / "connection.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(saved, dict) or _identify_fingerprint(_identify_record(saved)) != target:
+            continue
+        for name in ("FINDINGS.md", "findings.md"):
+            path = root / name
+            if not path.is_file():
+                continue
+            try:
+                return {
+                    "id": root.name,
+                    "text": path.read_text(encoding="utf-8", errors="replace")[-30000:],
+                    "updated": int(path.stat().st_mtime),
+                }, 200
+            except OSError as error:
+                return {"error": str(error)}, 500
+    return {"id": "", "text": "", "updated": 0}, 200
+
+
 def identify_findings(workspace_id: str) -> tuple[dict, int]:
     if not IDENTIFY_ID.fullmatch(workspace_id or ""):
         return {"error": "bad investigation id"}, 400
@@ -1638,6 +1707,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(payload, status)
         if parsed.path == "/api/identify/workspace":
             return self._json(identify_workspace(body))
+        if parsed.path == "/api/identify/lookup":
+            payload, status = identify_lookup(body)
+            return self._json(payload, status)
         return self._json({"error": "not found"}, 404)
 
 
