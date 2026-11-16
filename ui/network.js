@@ -66,6 +66,7 @@ const net = {
   selId: "",
   ai: null,
   aiTimer: null,
+  inspectKey: "",
   hover: null,
   pinnedProc: "",
   labelHits: [],
@@ -417,6 +418,7 @@ async function pollNetIdentify() {
       try {
         const result = await backendRequest(`/api/identify/findings?id=${encodeURIComponent(ai.workspaceId)}`);
         ai.findings = result.text || "";
+        ai.findingsHtml = ai.findings ? mdToHtml(ai.findings) : "";
         if (!ai.findings) ai.error = "The agent finished without writing FINDINGS.md.";
       } catch (error) {
         ai.error = error.message || "Could not read the agent findings.";
@@ -433,6 +435,132 @@ async function pollNetIdentify() {
   ai.timer = setTimeout(pollNetIdentify, 1500);
 }
 
+// Findings come back as Markdown. Render a small, deliberately narrow subset
+// (headings, lists, code, emphasis, links, tables, quotes) so the report reads
+// like a document instead of raw source. Everything is escaped before any tag
+// is restored, and links are restricted to http(s).
+function mdInline(src) {
+  return String(src ?? "").split(/(`[^`\n]+`)/g).map((part) => {
+    if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) {
+      return `<code>${esc(part.slice(1, -1))}</code>`;
+    }
+    let s = esc(part);
+    s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[\s(])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    return s;
+  }).join("");
+}
+
+const mdRow = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+
+function mdToHtml(markdown) {
+  const lines = String(markdown || "").replace(/\r\n?/g, "\n").split("\n");
+  const out = [];
+  let para = [];
+  let list = null;
+  let quote = [];
+  let fence = null;
+
+  const flushPara = () => {
+    if (!para.length) return;
+    out.push(`<p>${mdInline(para.join(" "))}</p>`);
+    para = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    const tag = list.ordered ? "ol" : "ul";
+    out.push(`<${tag}>${list.items.map((item) => `<li>${mdInline(item)}</li>`).join("")}</${tag}>`);
+    list = null;
+  };
+  const flushQuote = () => {
+    if (!quote.length) return;
+    out.push(`<blockquote>${mdToHtml(quote.join("\n"))}</blockquote>`);
+    quote = [];
+  };
+  const flushAll = () => { flushPara(); flushList(); flushQuote(); };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const fenceMark = line.match(/^\s*(?:`{3,}|~{3,})\s*[\w+#.-]*\s*$/);
+    if (fence) {
+      if (fenceMark) {
+        out.push(`<pre><code>${esc(fence.join("\n"))}</code></pre>`);
+        fence = null;
+      } else {
+        fence.push(line);
+      }
+      continue;
+    }
+    if (fenceMark) { flushAll(); fence = []; continue; }
+    if (!line.trim()) { flushAll(); continue; }
+    if (/^\s*(?:[-*_])(?:\s*[-*_]){2,}\s*$/.test(line)) { flushAll(); out.push("<hr>"); continue; }
+
+    const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*$/);
+    if (heading) {
+      flushAll();
+      const level = heading[1].length;
+      out.push(`<h${level}>${mdInline(heading[2].replace(/\s+#+$/, ""))}</h${level}>`);
+      continue;
+    }
+
+    const quoted = line.match(/^\s*>\s?(.*)$/);
+    if (quoted) { flushPara(); flushList(); quote.push(quoted[1]); continue; }
+    flushQuote();
+
+    const next = lines[i + 1] || "";
+    if (line.includes("|") && /^\s{0,3}\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(next)) {
+      flushPara(); flushList();
+      const head = mdRow(line);
+      const rows = [];
+      i += 1;
+      while (i + 1 < lines.length && lines[i + 1].trim() && lines[i + 1].includes("|")) rows.push(mdRow(lines[++i]));
+      out.push(`<table><thead><tr>${head.map((cell) => `<th>${mdInline(cell)}</th>`).join("")}</tr></thead><tbody>${
+        rows.map((row) => `<tr>${head.map((_, k) => `<td>${mdInline(row[k] || "")}</td>`).join("")}</tr>`).join("")
+      }</tbody></table>`);
+      continue;
+    }
+
+    const item = line.match(/^\s*(?:([-*+])|(\d{1,3})[.)])\s+(.*)$/);
+    if (item) {
+      flushPara();
+      const ordered = !!item[2];
+      if (!list || list.ordered !== ordered) { flushList(); list = { ordered, items: [] }; }
+      list.items.push(item[3]);
+      continue;
+    }
+    if (list) { list.items[list.items.length - 1] += ` ${line.trim()}`; continue; }
+    para.push(line.trim());
+  }
+  flushAll();
+  if (fence) out.push(`<pre><code>${esc(fence.join("\n"))}</code></pre>`);
+  return out.join("");
+}
+
+// A 2.5s poll rebuilds this inspector. Keep the AI report and log at the same
+// scroll offset (and the log expanded) when the same connection is still on
+// screen, so reading is not interrupted by a refresh.
+function captureNetInspectScroll(body, key) {
+  if (!net.inspectKey || net.inspectKey !== key) return null;
+  return {
+    findings: body.querySelector(".ni-ai-findings")?.scrollTop || 0,
+    log: body.querySelector(".ni-ai-log")?.scrollTop || 0,
+    logOpen: !!body.querySelector(".ni-ai-log-wrap")?.open,
+  };
+}
+
+function restoreNetInspectScroll(body, saved, key) {
+  net.inspectKey = key;
+  if (!saved) return;
+  const findings = body.querySelector(".ni-ai-findings");
+  if (findings) findings.scrollTop = saved.findings;
+  const logWrap = body.querySelector(".ni-ai-log-wrap");
+  if (!logWrap) return;
+  logWrap.open = saved.logOpen;
+  const log = logWrap.querySelector(".ni-ai-log");
+  if (log) log.scrollTop = saved.log;
+}
+
 function renderNetInspector() {
   const body = document.getElementById("netInspectBody");
   const empty = document.getElementById("netInspectEmpty");
@@ -442,7 +570,7 @@ function renderNetInspector() {
   close.hidden = !c;
   empty.hidden = !!c;
   body.hidden = !c;
-  if (!c) { body.innerHTML = ""; return; }
+  if (!c) { net.inspectKey = ""; body.innerHTML = ""; return; }
 
   const state = c.gone ? "CLOSED" : c.state;
   const host = c.remote.host;
@@ -482,11 +610,13 @@ function renderNetInspector() {
       <div class="ni-ai-head"><span>AI identification</span><b data-state="${esc(ai.status)}">${esc(ai.status)}</b></div>
       ${aiBusy && !ai.findings ? `<p class="ni-ai-note">Investigating the connection with the configured agent…</p>` : ""}
       ${ai.error ? `<p class="ni-ai-error">${esc(ai.error)}</p>` : ""}
-      ${ai.findings ? `<div class="ni-ai-findings">${esc(ai.findings)}</div>` : ""}
+      ${ai.findings ? `<div class="ni-ai-findings">${ai.findingsHtml || mdToHtml(ai.findings)}</div>` : ""}
       ${ai.log ? `<details class="ni-ai-log-wrap"><summary>Agent log</summary><pre class="ni-ai-log">${esc(ai.log)}</pre></details>` : ""}
       <div class="ni-actions"><button class="btn btn-soft" type="button" data-ni-identify ${aiBusy ? "disabled" : ""}>${ai.jobId ? "Run again" : "Retry"}</button></div>
     </div>` : "";
 
+  const inspectKey = `${c.id}:${ai?.workspaceId || ""}`;
+  const savedScroll = captureNetInspectScroll(body, inspectKey);
   body.innerHTML = `
     <div class="ni-title-row">
       <span class="ni-state" data-state="${esc(state)}">${esc(state)}</span>
@@ -526,6 +656,7 @@ function renderNetInspector() {
     </div>
     ${!ai && agent.pending ? `<p class="ni-ai-note">Grant the Agent permission in System settings to enable AI identification.</p>` : ""}
     ${aiPanel}`;
+  restoreNetInspectScroll(body, savedScroll, inspectKey);
   requestAnimationFrame(drawNetSpark);
 }
 
