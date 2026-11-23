@@ -1,5 +1,7 @@
 # System
 
+![The System page showing host metrics, CPU cores, connected machines, storage, interfaces, and the Network Universe](docs/screenshot.png)
+
 Live host metrics plus two cross-platform diagnostics backed by a sidecar:
 
 - **Network Universe** — live TCP/UDP sockets enriched with process and remote
@@ -24,6 +26,8 @@ Network rates and traffic history are only available on Linux because it is the
 only platform here that exposes per-socket byte counters without eBPF or ETW.
 macOS and Windows still show live connections, ownership, endpoints, DNS, and
 service names.
+
+![The service browser showing active user services with restart, stop, and log actions](docs/services.png)
 
 ## AI identification
 
